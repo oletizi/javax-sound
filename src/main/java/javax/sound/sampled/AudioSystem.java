@@ -26,16 +26,14 @@
 package javax.sound.sampled;
 
 import com.sun.media.sound.JDK13Services;
+import com.sun.media.sound.WaveFileWriter;
 import net.sourceforge.jaad.spi.javasound.AACAudioFileReader;
 
 import javax.sound.sampled.spi.AudioFileReader;
 import javax.sound.sampled.spi.AudioFileWriter;
 import javax.sound.sampled.spi.FormatConversionProvider;
 import javax.sound.sampled.spi.MixerProvider;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.URL;
 import java.util.*;
 
@@ -1319,26 +1317,13 @@ public class AudioSystem {
   public static int write(AudioInputStream stream, AudioFileFormat.Type fileType,
                           OutputStream out) throws IOException {
 
-    List providers = getAudioFileWriters();
+
+    AudioFileWriter writer = getAudioFileWriterFor(fileType);
     int bytesWritten = 0;
     boolean flag = false;
 
-    for (int i = 0; i < providers.size(); i++) {
-      AudioFileWriter writer = (AudioFileWriter) providers.get(i);
-      try {
-        bytesWritten = writer.write(stream, fileType, out); // throws IOException
-        flag = true;
-        break;
-      } catch (IllegalArgumentException e) {
-        // thrown if this provider cannot write the sequence, try the next
-        continue;
-      }
-    }
-    if (!flag) {
-      throw new IllegalArgumentException("could not write audio file: file type not supported: " + fileType);
-    } else {
-      return bytesWritten;
-    }
+    bytesWritten = writer.write(stream, fileType, out); // throws IOException
+    return bytesWritten;
   }
 
 
@@ -1359,28 +1344,21 @@ public class AudioSystem {
    */
   public static int write(AudioInputStream stream, AudioFileFormat.Type fileType,
                           File out) throws IOException {
-
-    List providers = getAudioFileWriters();
-    System.out.println("FOUND " + providers.size() + " AudioFileWriter providers.");
-    int bytesWritten = 0;
-    boolean flag = false;
-
-    for (int i = 0; i < providers.size(); i++) {
-      AudioFileWriter writer = (AudioFileWriter) providers.get(i);
-      try {
-        System.out.println("CHECKING AudioFileWriter: " + writer);
-        bytesWritten = writer.write(stream, fileType, out); // throws IOException
-        flag = true;
-        break;
-      } catch (IllegalArgumentException e) {
-        // thrown if this provider cannot write the sequence, try the next
-        continue;
-      }
+    final FileOutputStream outputStream = new FileOutputStream(out);
+    int written = -1;
+    try {
+      written = write(stream, fileType, outputStream);
+    } finally {
+      outputStream.close();
     }
-    if (!flag) {
-      throw new IllegalArgumentException("could not write audio file: file type not supported: " + fileType);
+    return written;
+  }
+
+  private static AudioFileWriter getAudioFileWriterFor(AudioFileFormat.Type fileType) {
+    if (AudioFileFormat.Type.WAVE.equals(fileType)) {
+      return new WaveFileWriter();
     } else {
-      return bytesWritten;
+      throw new IllegalArgumentException("I only know how to deal with WAV files. Sorry.");
     }
   }
 
